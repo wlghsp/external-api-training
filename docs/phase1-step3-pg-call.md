@@ -17,18 +17,13 @@
 
 ## 1. PG 클라이언트 인터페이스 (domain)
 
+`PgApproveResult`는 step 2에서 이미 정의했다(`PaymentModel.approveOrElse`가 이 타입을 받으므로 도메인 쪽에서 먼저 정의됨). 여기서는 그 결과를 실제로 만들어내는 인터페이스만 추가한다.
+
 ```java
 package com.loopers.domain.payment;
 
 public interface PgClient {
     PgApproveResult approve(Long amount);
-}
-```
-
-```java
-package com.loopers.domain.payment;
-
-public record PgApproveResult(String transactionKey, boolean approved) {
 }
 ```
 
@@ -134,16 +129,18 @@ pg-simulator:
 
 ## 4. Facade에서 멱등 처리 + PG 호출 orchestration
 
+Facade는 "이미 승인됐는지" 스스로 판단하지 않는다. `PaymentModel.approveOrElse(...)`에게 "필요하면 이 콜백으로 승인해라"고 지시할 뿐이다 — 상태별 분기(`switch (status())`)는 도메인 객체 안으로 이미 옮겨졌다(step 2, `PaymentStatus` sealed interface).
+
 ```java
 package com.loopers.application.payment;
 
+import com.loopers.domain.payment.PaymentInfo;
 import com.loopers.domain.payment.PaymentModel;
 import com.loopers.domain.payment.PaymentService;
-import com.loopers.domain.payment.PaymentStatus;
-import com.loopers.domain.payment.PgApproveResult;
 import com.loopers.domain.payment.PgClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @RequiredArgsConstructor
@@ -152,21 +149,14 @@ public class PaymentFacade {
     private final PaymentService paymentService;
     private final PgClient pgClient;
 
+    @Transactional
     public PaymentInfo charge(String idempotencyKey, Long amount) {
         PaymentModel payment = paymentService.getOrCreate(idempotencyKey, amount);
-
-        if (payment.getStatus() == PaymentStatus.APPROVED) {
-            return PaymentInfo.from(payment); // 이미 처리됨 - PG 재호출 없이 기존 결과 반환
-        }
-
-        PgApproveResult result = pgClient.approve(amount);
-        payment.approve(result.transactionKey());
-        return PaymentInfo.from(payment);
+        payment.approveOrElse(() -> pgClient.approve(amount));
+        return payment.toInfo();
     }
 }
 ```
-
-`PaymentInfo`는 `ExampleInfo` 패턴을 따라 도메인 모델 → API 응답 DTO 변환용으로 별도 생성.
 
 ---
 

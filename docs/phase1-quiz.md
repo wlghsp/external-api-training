@@ -26,11 +26,22 @@
 
 ## 축 2: 멱등 저장 방식 선택
 
-1. DB unique constraint / Redis SETNX / Optimistic Lock 중 뭘 선택했나?
-2. 나머지 두 방식은 왜 배제했나? 각각의 트레이드오프를 설명해봐라.
-3. 선택한 방식에서 "동시에 같은 키로 두 요청이 들어오는" 경쟁 상황이 실제로 어떻게 처리되나 — 코드 상에서 어느 라인이 그 경쟁을 해소하나?
-4. (DB unique constraint 선택 시) `DataIntegrityViolationException`을 잡은 뒤 왜 다시 조회하나? 그냥 예외를 던지면 안 되는 이유는?
-5. 이 방식이 깨지는 경우가 있다면 무엇인가 (예: 트랜잭션 격리 수준, Redis 장애 등)?
+1. DB unique constraint / Redis SETNX / Optimistic Lock 각각의 특성과 트레이드오프를 설명해봐라. Optimistic Lock은 왜 이 문제(최초 요청 여부 판단)에 맞지 않았나?
+2. 최종적으로 Redis SETNX(1차) + DB unique constraint(최종 안전망) 이중 구조로 갔는데, DB unique constraint 하나만 썼을 때와 비교해 무엇이 나아지나?
+3. 반대로 Redis SETNX 하나만 썼다면 어떤 리스크가 남는가? 그 리스크를 DB unique constraint가 어떻게 메꿔주나?
+4. "동시에 같은 키로 두 요청이 들어오는" 경쟁 상황이 실제로 어떻게 처리되나 — Redis 레벨과 DB 레벨 각각에서 코드 상 어느 라인이 그 경쟁을 해소하나?
+5. `IdempotencyLock.acquire()`가 실패했는데 DB에는 아직 해당 레코드가 없는 상황이 있을 수 있나? 있다면 언제, 그리고 지금 코드는 이 상황을 어떻게 처리하나?
+6. `PaymentService.createNew()`에서 `DataIntegrityViolationException`을 잡는 코드가 여전히 필요한 이유는? Redis가 1차로 막아주는데 왜 DB에서도 또 막아야 하나 — 어떤 상황이면 Redis 선점이 뚫리는지 구체적으로 설명해봐라.
+7. Redis 락의 TTL을 5분으로 잡았다. 이 값을 결정할 때 고려해야 할 기준은 무엇인가 (너무 짧으면/너무 길면 각각 무슨 문제가 생기나)?
+8. 지금 구현은 명시적 `release()`를 호출하지 않는다. 이게 문제가 되는 시나리오가 있다면 무엇인가?
+
+## 축 2-1: 객체지향 설계 · Java 21 활용 (PaymentModel/PaymentStatus)
+
+1. `PaymentModel`에 `@Getter`를 붙이지 않았다. `status`를 왜 밖으로 그냥 꺼내주지 않고 `approveOrElse(...)` 같은 행위 메서드로 감쌌나? (Tell, Don't Ask를 본인 말로 설명)
+2. `PaymentStatus`를 enum이 아니라 sealed interface(`Pending`/`Approved`/`Failed` record)로 설계했다. enum으로 했다면 어떤 걸 놓쳤을까 — 특히 `transactionKey`가 "APPROVED일 때만 존재한다"는 규칙을 enum은 어떻게 표현하고 있었나(직전 버전을 떠올려서 비교)?
+3. `PaymentModel`은 `PaymentStatusType`(순수 enum, DB 컬럼용)과 `PaymentStatus`(sealed interface, 도메인 로직용) 두 가지 상태 표현을 갖고 있다. 왜 하나로 통일하지 않았나 — JPA 쪽 제약이 무엇이었나?
+4. `switch (status())`로 상태별 분기를 할 때, 세 가지 케이스(Pending/Approved/Failed) 중 하나를 처리 안 하고 빠뜨리면 무슨 일이 일어나나? enum + 일반 `switch`/`if-else`였다면 같은 실수가 어떻게 드러났을까 — 이 차이가 왜 중요한가?
+5. `approveOrElse`가 `PgApproveResult`를 받기 위해 `Supplier<PgApproveResult>` 콜백을 매개변수로 받는다. 왜 `PgClient`를 직접 필드로 주입받지 않았나?
 
 ## 축 3: Circuit Breaker 상태 전이
 

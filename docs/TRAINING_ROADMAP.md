@@ -20,6 +20,11 @@
 이해도 테스트를 통과하지 못하면 다음 Phase로 넘어가지 않는다 (각 phaseN-quiz.md 기준)
 ```
 
+## 코드 작성 원칙 (모든 Phase 공통)
+
+1. **객체지향** — Getter/Setter로 상태를 꺼내 바깥에서 판단하는 절차지향 방식(Anemic Domain Model)을 지양한다. Tell, Don't Ask — 객체에게 판단과 행위를 맡기고, 호출부는 지시만 한다. SOLID를 따른다.
+2. **Java 최신 트렌드 반영** — 이 프로젝트는 Java 21을 타겟한다(`gradle.properties`). `record`, `sealed interface`, `switch` 패턴 매칭 등 Java 21까지 정식으로 들어온 기능을 적극 활용하고, 오래된 관용구(순수 enum + if-else 사슬, 원시 `Map<String,Object>` 등)에 안주하지 않는다. "Java를 알고 쓴다"는 게 목표 — 기능을 아는 것과 실제로 설계에 녹이는 것은 다르다.
+
 ---
 
 ## 실습 환경
@@ -80,10 +85,12 @@ origin(wlghsp fork)에 자유롭게 커밋/푸시하면 된다. upstream과는 �
 - PG timeout처럼 응답을 모르는 상태(unknown state)에서 결제 상태를 조회·동기화하는 Reconciliation 잡을 구현할 수 있다.
 - 예외를 재시도 가능 / 재시도 불가능 / 비즈니스 / 시스템 네 축으로 분류하고 각각 다른 대응을 코드로 표현할 수 있다.
 - 보상 트랜잭션(Compensating Transaction)이 필요한 시나리오와 단순 롤백으로 충분한 시나리오를 구분할 수 있다.
+- 결제 상태가 확정/변경되는 시점(정상 승인, Reconciliation으로 unknown state 해소, 보상 트랜잭션 발동)에 도메인 이벤트를 발행하고, 이벤트 발행을 트랜잭션 경계와 어떻게 맞물리게 할지(트랜잭션 커밋 이후에만 발행 vs 함께 처리) 설계 근거를 설명할 수 있다.
 
 **실습**:
 - `pg-simulator`에서 응답 지연으로 timeout을 강제 발생시켜 unknown state 재현
 - `apps/commerce-batch`를 활용해 Reconciliation 배치 잡 구현
+- `PaymentModel`이 상태를 확정할 때(승인/실패/재조회로 확정) `PaymentCompletedEvent`/`PaymentFailedEvent` 같은 도메인 이벤트를 발행하도록 구현. Spring의 `ApplicationEventPublisher` + `@TransactionalEventListener(phase = AFTER_COMMIT)` 조합으로, 트랜잭션이 확실히 커밋된 후에만 이벤트가 리스너에 전달되게 한다 (커밋 전에 이벤트가 나가면 리스너가 아직 존재하지 않는 데이터를 참조하게 되는 문제를 피하기 위함)
 
 ---
 
