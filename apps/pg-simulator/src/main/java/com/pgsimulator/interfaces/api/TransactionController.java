@@ -35,7 +35,7 @@ public class TransactionController {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(new ErrorResponse("PG 응답 실패 (시뮬레이션)"));
         }
         String transactionKey = UUID.randomUUID().toString();
-        log.info("PG 시뮬레이터 - 결제 승인, transactionKey: {}", transactionKey);
+        log.info("PG 시뮬레이터 - 결제 승인, transactionKey: {}, amount={}", transactionKey, request.amount());
         return ResponseEntity.ok(new TransactionResponse(transactionKey, "APPROVED"));
     }
 
