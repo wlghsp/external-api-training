@@ -17,6 +17,7 @@
 실습 없이 다음 Phase로 넘어가지 않는다
 문서 완성 → 블로그 발행 → 이해도 테스트 순서를 지킨다 (발행 전 테스트 금지)
 "대충 알 것 같다"는 완료가 아니다 — 설명할 수 있어야 완료다
+이해도 테스트를 통과하지 못하면 다음 Phase로 넘어가지 않는다 (각 phaseN-quiz.md 기준)
 ```
 
 ---
@@ -56,7 +57,8 @@ origin(wlghsp fork)에 자유롭게 커밋/푸시하면 된다. upstream과는 �
 ## 각 Phase 상세
 
 ### Phase 1: 외부 API는 언제든 실패한다 — 멱등 처리 · Circuit Breaker · Fallback
-**파일**: `phase1-idempotency-circuitbreaker.md` (미작성)
+**파일**: `phase1-step1-pg-simulator.md` ~ `phase1-step5-fallback.md` (작성 완료)
+**이해도 테스트**: `phase1-quiz.md` (grilling 스타일 인터뷰) — 통과 전까지 Phase 2 착수 금지
 **완료 기준**:
 - Idempotency Key를 클라이언트/게이트웨이/도메인 중 어디서 생성하고 어디까지 전파할지 설계 근거를 설명할 수 있다.
 - DB unique constraint, Redis SETNX, Optimistic Lock 중 도메인 특성에 맞는 방식을 고르고 이유를 댈 수 있다.
@@ -72,6 +74,7 @@ origin(wlghsp fork)에 자유롭게 커밋/푸시하면 된다. upstream과는 �
 
 ### Phase 2: 결제는 성공했는데 우리 DB는 모를 때 — 정합성 회복
 **파일**: `phase2-reconciliation.md` (미작성)
+**이해도 테스트**: `phase2-quiz.md` (미작성, Phase 1 quiz와 동일 형식) — 통과 전까지 Phase 3 착수 금지
 **완료 기준**:
 - 외부 API 호출과 로컬 트랜잭션의 경계(트랜잭션 안 vs 밖)를 어디에 그을지 결정하고 트레이드오프를 설명할 수 있다.
 - PG timeout처럼 응답을 모르는 상태(unknown state)에서 결제 상태를 조회·동기화하는 Reconciliation 잡을 구현할 수 있다.
@@ -86,6 +89,7 @@ origin(wlghsp fork)에 자유롭게 커밋/푸시하면 된다. upstream과는 �
 
 ### Phase 3: 풀 사이즈를 '감'이 아닌 '계산'으로 산정한다
 **파일**: `phase3-connection-pool-sizing.md` (미작성)
+**이해도 테스트**: `phase3-quiz.md` (미작성, Phase 1 quiz와 동일 형식) — 통과 전까지 Phase 4 착수 금지
 **완료 기준**:
 - Little's Law를 TPS와 평균 latency에 대입해 필요 커넥션 수를 계산할 수 있다.
 - HikariCP 핵심 파라미터의 의미와 잘못 설정했을 때의 증상을 매칭할 수 있다.
@@ -101,6 +105,7 @@ origin(wlghsp fork)에 자유롭게 커밋/푸시하면 된다. upstream과는 �
 
 ### Phase 4: 한 PG사가 죽어도 우리 서비스는 죽지 않는다
 **파일**: `phase4-bulkhead-ha.md` (미작성)
+**이해도 테스트**: `phase4-quiz.md` (미작성, Phase 1 quiz와 동일 형식) — 전체 트레이닝 완료 조건
 **완료 기준**:
 - Bulkhead 패턴을 Semaphore 방식과 ThreadPool 방식으로 각각 구현하고 격리 수준·비용을 비교 설명할 수 있다.
 - 외부 의존성 하나의 장애가 전체 스레드를 잠식하는 시나리오를 재현하고 Bulkhead로 막는 과정을 코드와 메트릭으로 보여줄 수 있다.

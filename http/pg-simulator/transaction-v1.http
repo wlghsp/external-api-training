@@ -1,0 +1,31 @@
+### 정상 승인
+POST {{pg-simulator}}/api/v1/transactions
+Content-Type: application/json
+
+{
+  "amount": 10000
+}
+
+### 지연 재현 (3초)
+POST {{pg-simulator}}/api/v1/transactions?delayMs=3000
+Content-Type: application/json
+
+{
+  "amount": 10000
+}
+
+### 강제 실패
+POST {{pg-simulator}}/api/v1/transactions?forceFail=true
+Content-Type: application/json
+
+{
+  "amount": 10000
+}
+
+### 확률적 실패 (50%) - Circuit Breaker sliding window 관찰용
+POST {{pg-simulator}}/api/v1/transactions?failureRate=0.5
+Content-Type: application/json
+
+{
+  "amount": 10000
+}
