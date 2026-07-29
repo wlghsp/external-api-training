@@ -13,6 +13,7 @@ public interface PaymentV1ApiSpec {
     )
     ApiResponse<PaymentV1Dto.ChargeResponse> charge(
             String idempotencyKey,
-            PaymentV1Dto.ChargeRequest request
+            PaymentV1Dto.ChargeRequest request,
+            boolean forceFail
     );
 }

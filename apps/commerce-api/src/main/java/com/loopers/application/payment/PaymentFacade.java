@@ -16,9 +16,9 @@ public class PaymentFacade {
     private final PgClient pgClient;
 
     @Transactional
-    public PaymentInfo charge(String idempotencyKey, Long amount) {
+    public PaymentInfo charge(String idempotencyKey, Long amount, boolean forceFail) {
         PaymentModel payment = paymentService.getOrCreate(idempotencyKey, amount);
-        payment.approveOrElse(() -> pgClient.approve(amount));
+        payment.approveOrElse(() -> pgClient.approve(amount, forceFail));
         return payment.toInfo();
     }
 

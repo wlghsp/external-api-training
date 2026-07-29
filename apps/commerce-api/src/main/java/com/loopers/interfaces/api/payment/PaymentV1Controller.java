@@ -16,9 +16,10 @@ public class PaymentV1Controller implements PaymentV1ApiSpec {
     @Override
     public ApiResponse<PaymentV1Dto.ChargeResponse> charge(
             @RequestHeader("Idempotency-Key") String idempotencyKey,
-            @RequestBody PaymentV1Dto.ChargeRequest request
+            @RequestBody PaymentV1Dto.ChargeRequest request,
+            @RequestParam(required = false, defaultValue = "false") boolean forceFail
     ) {
-        PaymentInfo info = paymentFacade.charge(idempotencyKey, request.amount());
+        PaymentInfo info = paymentFacade.charge(idempotencyKey, request.amount(), forceFail);
         return ApiResponse.success(PaymentV1Dto.ChargeResponse.from(info));
     }
 }
