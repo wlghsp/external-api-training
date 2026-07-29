@@ -2,6 +2,7 @@ package com.loopers.config;
 
 import com.loopers.domain.payment.PgClient;
 import com.loopers.infrastructure.payment.PgSimulatorClient;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
 import org.springframework.boot.http.client.ClientHttpRequestFactorySettings;
@@ -17,7 +18,8 @@ public class PgClientConfig {
     @Bean
     public PgClient pgClient(
             RestClient.Builder builder,
-            @Value("${pg-simulator.base-url}") String baseUrl
+            @Value("${pg-simulator.base-url}") String baseUrl,
+            MeterRegistry meterRegistry
     ) {
         var factory = ClientHttpRequestFactoryBuilder.detect()
                 .build(ClientHttpRequestFactorySettings.defaults()
@@ -25,6 +27,6 @@ public class PgClientConfig {
                         .withReadTimeout(Duration.ofSeconds(3))
                 );
 
-        return new PgSimulatorClient(builder.requestFactory(factory), baseUrl);
+        return new PgSimulatorClient(builder.requestFactory(factory), baseUrl, meterRegistry);
     }
 }

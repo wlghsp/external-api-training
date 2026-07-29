@@ -70,7 +70,46 @@ public class PgSimulatorClient implements PgClient {
 }
 ```
 
-Grafana에서 `pg_client_fallback_total` 메트릭을 패널로 추가해 fallback 발생 빈도를 시계열로 확인할 수 있음.
+**`PgClientConfig`도 같이 고쳐야 한다.** 생성자 파라미터가 2개(`builder`, `baseUrl`)에서 3개(`MeterRegistry` 추가)로 늘었으므로, `PgSimulatorClient`를 생성하는 `@Bean` 메서드가 이 인자를 넘겨주지 않으면 컴파일이 안 된다:
+
+```java
+package com.loopers.config;
+
+import com.loopers.domain.payment.PgClient;
+import com.loopers.infrastructure.payment.PgSimulatorClient;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
+import org.springframework.boot.http.client.ClientHttpRequestFactorySettings;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.client.RestClient;
+
+import java.time.Duration;
+
+@Configuration
+public class PgClientConfig {
+
+    @Bean
+    public PgClient pgClient(
+            RestClient.Builder builder,
+            @Value("${pg-simulator.base-url}") String baseUrl,
+            MeterRegistry meterRegistry
+    ) {
+        var factory = ClientHttpRequestFactoryBuilder.detect()
+                .build(ClientHttpRequestFactorySettings.defaults()
+                        .withConnectTimeout(Duration.ofSeconds(2))
+                        .withReadTimeout(Duration.ofSeconds(3))
+                );
+
+        return new PgSimulatorClient(builder.requestFactory(factory), baseUrl, meterRegistry);
+    }
+}
+```
+
+`MeterRegistry`는 `supports/monitoring`(Micrometer)이 이미 자동 구성해주는 빈이라 별도 등록 없이 파라미터로 받기만 하면 주입된다.
+
+Grafana에서 `pg_client_fallback_total` 메트릭을 패널로 추가해 fallback 발생 빈도를 시계열로 확인할 수 있음 (세팅 절차는 [grafana-setup.md](grafana-setup.md)).
 
 ---
 

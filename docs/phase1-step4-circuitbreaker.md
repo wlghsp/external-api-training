@@ -187,7 +187,7 @@ public class CircuitBreakerEventLogger {
 }
 ```
 
-Grafana(localhost:3000)에서 `resilience4j_circuitbreaker_state` 메트릭으로 CLOSED/OPEN/HALF_OPEN 상태를 시계열로 확인. `wait-duration-in-open-state`(10초) 경과 후 HALF_OPEN으로 넘어가는데, 이 상태에서 **`forceFail` 없이(정상) 요청**을 보내야 CLOSED로 복귀한다:
+Grafana(localhost:3000)에서 `resilience4j_circuitbreaker_state` 메트릭으로 CLOSED/OPEN/HALF_OPEN 상태를 시계열로 확인 (Grafana 세팅이 아직 안 되어 있으면 [grafana-setup.md](grafana-setup.md) 참고). `wait-duration-in-open-state`(10초) 경과 후 HALF_OPEN으로 넘어가는데, 이 상태에서 **`forceFail` 없이(정상) 요청**을 보내야 CLOSED로 복귀한다:
 
 ```shell
 curl -i -X POST http://localhost:8080/api/v1/payments \
