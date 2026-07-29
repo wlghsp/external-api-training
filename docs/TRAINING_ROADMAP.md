@@ -36,7 +36,7 @@ Kotlin 버전과 달리 결제 도메인 코드와 PG 시뮬레이터가 없어�
 - `apps/commerce-batch` — Phase 2 Reconciliation 잡을 붙일 배치 모듈
 - `apps/commerce-streamer` — 이번 트레이닝에서는 사용 여부 미정
 - `pg-simulator` — 아직 없음. Phase 1에서 외부 PG사 역할을 하는 간단한 Spring 앱으로 직접 만든다 (지연/실패 응답을 인위로 만들 수 있는 API 한두 개면 충분)
-- `docker/infra-compose.yml` — MySQL, Redis, Kafka
+- `docker/infra-compose.yml` — MySQL, Redis (master+readonly). Kafka는 Phase 1~4 어디에도 필요하지 않아 주석 처리해둠 (`modules:kafka`, `apps:commerce-streamer` 코드/모듈은 그대로 있음 — 나중에 필요해지면 주석만 풀면 됨)
 - `docker/monitoring-compose.yml` — Prometheus + Grafana (localhost:3000, admin/admin)
 
 시작 전 최초 1회 세팅:

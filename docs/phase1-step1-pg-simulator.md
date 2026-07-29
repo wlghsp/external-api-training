@@ -7,9 +7,11 @@
 
 ## 결정 지점
 
-- **지연을 흉내낼 방법**: 고정 sleep vs 요청 파라미터로 지연 시간(ms) 지정 → 재현성을 위해 파라미터 방식 권장
-- **실패를 흉내낼 방법**: 랜덤 확률 vs 요청 파라미터/헤더로 강제 지정 → 실습 초반엔 강제 지정이 디버깅하기 쉽고, Circuit Breaker 단계(step 4)에서는 확률 방식이 sliding window를 관찰하기 좋음. 둘 다 지원하는 것도 방법
-- **포트**: `8081`로 고정. `commerce-api`는 `application.yml`에 별도 지정이 없어 Spring Boot 기본값(8080)을 쓰고, `docker/infra-compose.yml`·`docker/monitoring-compose.yml`이 점유한 포트는 3000/3306/6379/6380/9090/9092/9099 — 8081은 이 중 어디와도 겹치지 않음
+| 항목 | 선택 | 근거 |
+|---|---|---|
+| 지연 흉내 | 요청 파라미터(`delayMs`) | 고정 sleep보다 재현성 좋음 |
+| 실패 흉내 | 파라미터 강제(`forceFail`) + 확률(`failureRate`) 둘 다 지원 | 강제 지정은 디버깅용, 확률은 step 4 sliding window 관찰용 |
+| 포트 | `8082` | commerce-api 앱 자체(8080)와는 안 겹치지만, `monitoring.yml`의 actuator 관리 포트(`management.server.port: 8081`)와 처음에 충돌해서 8082로 조정. docker-compose 포트(3000/3306/6379/6380/9090)와도 무관 |
 
 ---
 
@@ -54,7 +56,7 @@ dependencies {
 
 ```yaml
 server:
-  port: 8081
+  port: 8082
 
 spring:
   application:
@@ -170,13 +172,13 @@ public class TransactionController {
 
 ```shell
 # 정상 응답
-curl -X POST http://localhost:8081/api/v1/transactions -H "Content-Type: application/json" -d '{}'
+curl -X POST http://localhost:8082/api/v1/transactions -H "Content-Type: application/json" -d '{}'
 
 # 지연 재현
-curl -X POST "http://localhost:8081/api/v1/transactions?delayMs=3000" -H "Content-Type: application/json" -d '{}'
+curl -X POST "http://localhost:8082/api/v1/transactions?delayMs=3000" -H "Content-Type: application/json" -d '{}'
 
 # 강제 실패
-curl -X POST "http://localhost:8081/api/v1/transactions?forceFail=true" -H "Content-Type: application/json" -d '{}'
+curl -X POST "http://localhost:8082/api/v1/transactions?forceFail=true" -H "Content-Type: application/json" -d '{}'
 ```
 
 지연/실패 응답이 의도대로 나오면 다음 단계 → [phase1-step2-idempotency.md](phase1-step2-idempotency.md)

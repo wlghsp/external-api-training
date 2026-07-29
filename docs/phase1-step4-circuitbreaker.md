@@ -9,9 +9,11 @@
 
 ## 결정 지점
 
-- **sliding window 타입**: COUNT_BASED(최근 N건) vs TIME_BASED(최근 N초) — 트래픽이 일정하지 않은 결제 API라면 COUNT_BASED가 예측하기 쉬움
-- **failure-rate-threshold**: 몇 %가 실패하면 OPEN으로 갈지 — 너무 낮으면 일시적 노이즈에도 차단, 너무 높으면 장애 감지가 늦음. 실습에서는 관찰이 목적이므로 50% 근처로 설정해 전이를 쉽게 재현
-- **slow-call-duration-threshold**: 몇 ms 넘으면 "느린 호출"로 간주해 실패처럼 카운트할지 — Step 3에서 잡은 `readTimeout`(3초)보다 짧게 잡아야 타임아웃 전에 감지됨
+| 항목 | 값 | 근거 |
+|---|---|---|
+| sliding window 타입 | COUNT_BASED | 트래픽이 일정하지 않은 결제 API는 TIME_BASED보다 예측하기 쉬움 |
+| failure-rate-threshold | 50% | 실습 목적상 전이를 쉽게 재현하려고 낮게 설정. 실제로는 너무 낮으면 노이즈에도 차단, 너무 높으면 장애 감지가 늦어짐 |
+| slow-call-duration-threshold | 2s | Step 3의 `readTimeout`(3초)보다 짧게 잡아야 타임아웃 전에 "느린 호출"로 감지됨 |
 
 ---
 
@@ -102,23 +104,28 @@ public class PgSimulatorClient implements PgClient {
 
 ## 4. 상태 전이 관찰
 
+**1단계 — commerce-api, pg-simulator 둘 다 기동**
 ```shell
-./gradlew :apps:commerce-api:bootRun
+./gradlew :apps:pg-simulator:bootRun    # 터미널 1
+./gradlew :apps:commerce-api:bootRun    # 터미널 2
 ```
 
-pg-simulator의 실패율을 높여서 강제로 OPEN 전이 유도:
-
-```shell
-# pg-simulator가 항상 실패하도록 (엔드포인트에 파라미터를 고정하거나, 임시로 코드 수정)
+**2단계 — pg-simulator를 항상 실패하도록 임시 수정** (step 3의 강제 실패 확인과 동일한 방식)
+```java
+// PgSimulatorClient.java
+.uri("/api/v1/transactions?forceFail=true")
 ```
 
-또는 반복 요청 스크립트로 재현:
-
+**3단계 — commerce-api로 반복 요청을 보내 OPEN 전이 유도**
 ```shell
 for i in $(seq 1 15); do
-  curl -X POST "http://localhost:8081/api/v1/transactions?forceFail=true" -H "Content-Type: application/json" -d '{}' &
+  curl -X POST http://localhost:8080/api/v1/payments \
+    -H "Content-Type: application/json" \
+    -H "Idempotency-Key: cb-test-$i" \
+    -d '{"amount": 1000}' &
 done
 ```
+매번 다른 `Idempotency-Key`를 써야 한다 — 같은 키면 step 2의 멱등 처리가 재호출 자체를 막아서 Circuit Breaker에 호출이 쌓이지 않는다.
 
 로그에서 `CircuitBreaker 'pg-simulator' changed state from CLOSED to OPEN` 같은 이벤트 확인 (Resilience4j가 기본으로 로그를 남기지 않으면 `CircuitBreakerRegistry`에 리스너를 등록해서 로그 추가):
 
@@ -155,9 +162,13 @@ Grafana(localhost:3000)에서 `resilience4j_circuitbreaker_state` 메트릭으�
 
 ## 확인
 
-- 정상 상태에서는 CLOSED 유지, 요청이 그대로 pg-simulator까지 도달하는지 확인
-- 강제 실패를 반복하면 `minimum-number-of-calls`(5건) 이후 `failure-rate-threshold`(50%) 초과 시 OPEN으로 전이하는지 확인
-- OPEN 상태에서는 pg-simulator를 호출하지 않고 즉시 fallback이 실행되는지 확인 (로그에서 실제 HTTP 호출이 안 나가는지 체크)
-- `wait-duration-in-open-state` 경과 후 HALF_OPEN → (성공 시) CLOSED 복귀 확인
+| # | 확인 항목 | 방법 | 기대 결과 |
+|---|---|---|---|
+| 1 | CLOSED 정상 동작 | pg-simulator 정상 상태에서 요청 | 요청이 그대로 pg-simulator까지 도달, CLOSED 유지 |
+| 2 | OPEN 전이 | 위 4번 절차대로 강제 실패 반복 | `minimum-number-of-calls`(5건) 이후 `failure-rate-threshold`(50%) 초과 시 OPEN 전이 로그 |
+| 3 | OPEN 상태의 단락(short-circuit) | OPEN 전이 직후 추가 요청 | pg-simulator에 실제 HTTP 요청이 안 나가고 즉시 fallback 실행 (pg-simulator 콘솔에 로그가 안 찍히는지로 확인) |
+| 4 | HALF_OPEN 복귀 | 강제 실패를 원복하고 `wait-duration-in-open-state`(10초) 대기 후 재요청 | HALF_OPEN → 성공 시 CLOSED로 복귀 |
+
+확인이 끝나면 `PgSimulatorClient.java`의 `?forceFail=true`를 지우고 원래 코드로 되돌린다.
 
 다음 단계 → [phase1-step5-fallback.md](phase1-step5-fallback.md)

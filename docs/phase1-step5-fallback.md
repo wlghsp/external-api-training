@@ -9,9 +9,11 @@
 
 ## 결정 지점
 
-- **Fallback 시 사용자에게 뭘 보여줄지**: 결제는 "일단 성공한 것처럼" 응답하면 안 되는 도메인 — 명확히 실패(503 등)를 반환하고 재시도를 유도해야 함. Step 4의 fallback이 `CoreException`을 던지는 이유가 이것
-- **Fallback이 조용한 실패가 되지 않으려면**: fallback이 실행될 때마다 (1) 메트릭 카운터 증가 (2) 임계치 넘으면 알람 — 이 둘 중 최소한 메트릭은 필수, 알람은 운영 환경에서만 켤지 실습에서도 켤지 결정
-- **Slack 알람 연동 여부**: `supports/logging`에 이미 Slack appender가 있음 — 실습에서 실제로 Slack 채널까지 연결할지, 로그 레벨(`WARN`/`ERROR`)만으로 남길지는 선택. 실습 목적이면 로그로 충분하고, "알람과 함께 설계할 수 있다"는 완료 기준은 연동 여부와 무관하게 설계 근거를 설명할 수 있으면 됨
+| 항목 | 선택 | 근거 |
+|---|---|---|
+| 사용자 응답 | 명확한 실패(503 등), "일단 성공"처럼 위장하지 않음 | 결제 도메인 특성상 재시도를 유도해야 함 — step 4의 fallback이 `CoreException`을 던지는 이유 |
+| 조용한 실패 방지 | 메트릭 카운터 필수, 알람은 선택 | fallback 실행 시 최소한 관측 가능해야 함 |
+| Slack 알람 연동 | 로그(`WARN`)로 대체, 실제 연동은 생략 | `supports/logging`에 Slack appender가 이미 있지만, 완료 기준("알람과 함께 설계할 수 있다")은 연동 여부와 무관하게 설계 근거 설명으로 충족 가능 |
 
 ---
 
@@ -93,19 +95,21 @@ SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, HttpStatus.SERVICE_UNAVAILAB
 
 ## 확인
 
-- Circuit Breaker가 OPEN 상태일 때 fallback이 실행되고, `pg_client_fallback_total` 메트릭이 증가하는지 확인
-- 사용자에게 반환되는 응답이 200이 아니라 명확한 실패 상태 코드(503 등)인지 확인
-- 로그에 fallback 발생 원인(`Throwable` 메시지)이 남는지 확인
+| # | 확인 항목 | 방법 | 기대 결과 |
+|---|---|---|---|
+| 1 | fallback 메트릭 증가 | Circuit Breaker OPEN 상태에서 요청 | `pg_client_fallback_total` 메트릭 증가 (Grafana 또는 `/actuator/prometheus` 응답으로 확인) |
+| 2 | 응답 상태 코드 | 위와 동일 | 200이 아닌 명확한 실패 상태 코드(503 등) |
+| 3 | 실패 원인 로깅 | 위와 동일 | 로그에 `Throwable` 메시지가 남는지 |
 
 ---
 
 ## Phase 1 완료 체크
 
-모든 단계를 마쳤다면 `TRAINING_ROADMAP.md`의 Phase 1 완료 기준 4가지를 스스로 설명할 수 있는지 점검:
+| # | 완료 기준 (`TRAINING_ROADMAP.md`) | 관련 문서 |
+|---|---|---|
+| 1 | Idempotency Key를 어디서 생성하고 어디까지 전파할지 설계 근거 | step 2 |
+| 2 | Redis SETNX + DB unique constraint 이중화를 선택한 이유 | step 2, [explainer](phase1-step2-explainer.md) |
+| 3 | CLOSED → OPEN → HALF_OPEN 상태 전이를 로그/Grafana로 관찰하고 튜닝 근거 설명 | step 4 |
+| 4 | Fallback이 조용한 실패가 되지 않도록 한 설계 | step 5 |
 
-1. Idempotency Key를 어디서 생성하고 어디까지 전파할지 설계 근거
-2. DB unique constraint / Redis SETNX / Optimistic Lock 중 선택 이유
-3. CLOSED → OPEN → HALF_OPEN 상태 전이를 로그/Grafana로 관찰하고 튜닝 근거 설명
-4. Fallback이 조용한 실패가 되지 않도록 한 설계
-
-문서 완성 → 블로그 발행 → 이해도 테스트 순서 (로드맵 규칙, 발행 전 테스트 금지).
+문서 완성 → 블로그 발행 → 이해도 테스트([phase1-quiz.md](phase1-quiz.md)) 순서 (로드맵 규칙, 발행 전 테스트 금지).
